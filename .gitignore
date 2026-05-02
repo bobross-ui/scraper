@@ -1,0 +1,24 @@
+.env
+.DS_Store
+__pycache__/
+*.py[cod]
+.venv/
+.claude/
+
+# data — ignore everything except gitkeeps and the final CSV
+data/pdfs/*
+data/raw_text/*
+data/parsed/*
+data/answer_keys/*
+data/extracted/*
+data/enriched/*
+data/logs/*
+data/final/*
+!data/**/.gitkeep
+!data/final/questions_master.csv
+
+
+CAT_Duel_Schema_Changes.md
+CAT_Question_Extractor_Execution_Plan.md
+CLAUDE.md
+PROGRESS.md
