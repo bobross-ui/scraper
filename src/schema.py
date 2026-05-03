@@ -14,37 +14,26 @@ class QuestionType(str, Enum):
 
 
 class QuestionSubType(str, Enum):
-    QUANT_STANDARD       = "QUANT_STANDARD"
-    VARC_RC              = "VARC_RC"
-    VARC_JUMBLE          = "VARC_JUMBLE"
-    VARC_ODD_ONE_OUT     = "VARC_ODD_ONE_OUT"
+    QUANT_STANDARD        = "QUANT_STANDARD"
+    VARC_RC               = "VARC_RC"
+    VARC_JUMBLE           = "VARC_JUMBLE"
+    VARC_ODD_ONE_OUT      = "VARC_ODD_ONE_OUT"
     VARC_MISSING_SENTENCE = "VARC_MISSING_SENTENCE"
-    VARC_SUMMARY         = "VARC_SUMMARY"
-    VARC_PARA_COMPLETION = "VARC_PARA_COMPLETION"
-    DILR_STANDARD        = "DILR_STANDARD"
+    VARC_SUMMARY          = "VARC_SUMMARY"
+    VARC_PARA_COMPLETION  = "VARC_PARA_COMPLETION"
+    DILR_STANDARD         = "DILR_STANDARD"
 
 
-class ParsedQuestion(BaseModel):
-    """Output of Stage 2 (block_splitter). Raw, unprocessed."""
-    question_number: int
-    type: QuestionType
-    sub_type: QuestionSubType
-    shared_passage: str | None
-    raw_text: str
-    raw_options: list[str] | None   # None for TITA
-    raw_explanation: str | None
-    source_pdf: str
-
-
-class ExtractedQuestion(BaseModel):
-    """Output of Stage 3 (llm_cleaner). LLM-cleaned, answer merged in."""
+class Question(BaseModel):
     question_number: int
     category: QuestionCategory
     type: QuestionType
     sub_type: QuestionSubType
-    text: str                       # cleaned; RC has [PASSAGE]/[QUESTION] markers
-    options: list[str] | None       # None for TITA
-    correct_answer: str             # "0"-"3" for MCQ; numeric string for TITA
+    text: str
+    options: list[str] | None
+    correct_answer: str
+    sub_topic: str | None
+    explanation: str
     source_pdf: str
 
     @model_validator(mode="after")
@@ -56,14 +45,7 @@ class ExtractedQuestion(BaseModel):
         return self
 
 
-class EnrichedQuestion(ExtractedQuestion):
-    """Output of Stage 4 (explanation_processor). Adds explanation + sub_topic."""
-    explanation: str
-    sub_topic: str | None
-
-
 class CSVRow(BaseModel):
-    """Flat row matching the bulk-upload CSV format."""
     type: QuestionType
     category: QuestionCategory
     sub_type: QuestionSubType
@@ -78,7 +60,7 @@ class CSVRow(BaseModel):
     explanation: str
 
     @classmethod
-    def from_enriched(cls, q: EnrichedQuestion) -> "CSVRow":
+    def from_question(cls, q: Question) -> "CSVRow":
         opts = q.options or []
         return cls(
             type=q.type,
