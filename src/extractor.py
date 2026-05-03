@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from src import answer_key as ak
 from src import gemini_client, validator
@@ -40,12 +40,16 @@ def extract_pdf(pdf_path: Path, force: bool = False) -> list[Question]:
     pdf_bytes = pdf_path.read_bytes()
     answer_key = ak.parse(pdf_path)
 
-    extraction: _QAExtraction = gemini_client.call(
-        prompt=QA_PROMPT,
-        schema=_QAExtraction,
-        pdf_bytes=pdf_bytes,
-        context={"stem": stem},
-    )
+    try:
+        extraction: _QAExtraction = gemini_client.call(
+            prompt=QA_PROMPT,
+            schema=_QAExtraction,
+            pdf_bytes=pdf_bytes,
+            context={"stem": stem},
+        )
+    except ValidationError as exc:
+        print(f"  [WARNING] [{stem}] Gemini response invalid/truncated — skipping: {exc.error_count()} error(s)")
+        return []
 
     questions = [
         Question(

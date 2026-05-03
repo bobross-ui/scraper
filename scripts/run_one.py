@@ -27,6 +27,10 @@ def main():
     tita = sum(1 for q in questions if q.type.value == "TITA")
     print(f"\nExtracted {len(questions)} questions (MCQ={mcq}, TITA={tita})")
 
+    if not questions:
+        print("No questions extracted — check warnings above.")
+        return
+
     q = questions[0]
     print(f"\n=== Sample: Q{q.question_number} ===")
     print(f"  Type       : {q.type.value} / {q.sub_type.value}")

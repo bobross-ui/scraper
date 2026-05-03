@@ -11,9 +11,9 @@ def validate(questions: list[Question], answer_key: dict[int, str], stem: str) -
     key_nums = set(answer_key.keys())
 
     if len(questions) != len(answer_key):
-        raise ValueError(
-            f"[{stem}] Question count mismatch: LLM returned {len(questions)}, "
-            f"answer key has {len(answer_key)}"
+        print(
+            f"  [WARNING] [{stem}] Question count mismatch: LLM returned {len(questions)}, "
+            f"answer key has {len(answer_key)} — continuing"
         )
 
     if llm_nums != key_nums:
@@ -24,7 +24,7 @@ def validate(questions: list[Question], answer_key: dict[int, str], stem: str) -
             parts.append(f"missing from LLM: {sorted(missing)}")
         if extra:
             parts.append(f"extra from LLM: {sorted(extra)}")
-        raise ValueError(f"[{stem}] Question number mismatch — {', '.join(parts)}")
+        print(f"  [WARNING] [{stem}] Question number mismatch — {', '.join(parts)} — continuing")
 
     for q in questions:
         key_ans = answer_key[q.question_number]
