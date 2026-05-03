@@ -35,6 +35,7 @@ class Question(BaseModel):
     sub_topic: str | None
     explanation: str
     source_pdf: str
+    answer_mismatch: bool = False
 
     @model_validator(mode="after")
     def check_options_vs_type(self):

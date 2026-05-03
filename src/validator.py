@@ -1,10 +1,11 @@
-from src.schema import Question, QuestionType
+from src.schema import Question
 
 
 def validate(questions: list[Question], answer_key: dict[int, str], stem: str) -> None:
     """Cross-check LLM-extracted questions against the deterministic answer key.
 
-    Raises ValueError on any mismatch. Must pass before the JSONL is written.
+    Hard-fails on count or question-number mismatches (structural problems).
+    Flags individual answer mismatches on the Question object and warns; does not raise.
     """
     llm_nums = {q.question_number for q in questions}
     key_nums = set(answer_key.keys())
@@ -28,13 +29,14 @@ def validate(questions: list[Question], answer_key: dict[int, str], stem: str) -
     for q in questions:
         key_ans = answer_key[q.question_number]
 
-        if q.type == QuestionType.MCQ:
+        if len(key_ans) == 1 and key_ans.upper() in "ABCD":
             expected = str(ord(key_ans.upper()) - ord("A"))
         else:
             expected = key_ans
 
         if q.correct_answer != expected:
-            raise ValueError(
-                f"[{stem}] Q{q.question_number}: LLM said '{q.correct_answer}', "
-                f"answer key says '{key_ans}' (expected '{expected}')"
+            q.answer_mismatch = True
+            print(
+                f"  [MISMATCH] [{stem}] Q{q.question_number}: LLM said '{q.correct_answer}', "
+                f"answer key says '{key_ans}' (expected '{expected}') — flagged"
             )

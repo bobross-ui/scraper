@@ -24,7 +24,7 @@ from pydantic import BaseModel, Field
 
 load_dotenv()
 
-# gemini-2.5-flash pricing per 1M tokens (paid tier).
+# gemini-2.5-flash-lite pricing per 1M tokens (paid tier).
 # Verify current rates: https://ai.google.dev/gemini-api/docs/pricing
 PRICE_INPUT_PER_M = 0.10
 PRICE_OUTPUT_PER_M = 0.40

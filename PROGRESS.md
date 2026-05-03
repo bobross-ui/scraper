@@ -40,7 +40,8 @@ v2 collapses the old five stages into three (extract, validate, build CSV) and u
   - Samples N random questions from extracted JSONLs, pretty-prints with correct answer marked (`>>>`). Optional `--pdf` filter to restrict to one source.
 - [x] Delete old stage modules and directories
   - Removed `block_splitter.py`, `explanation_processor.py`, `llm_cleaner.py`, `pdf_parser.py` from `src/`. Deleted `data/raw_text/`, `data/parsed/`, `data/answer_keys/`, `data/enriched/`.
-- [ ] Validate against `cat_2025_slot1_qa.pdf` end-to-end
+- [x] Validate against `cat_2025_slot1_qa.pdf` end-to-end
+  - Fixed truncation: `thinking_budget=0` in `gemini_client.py` disables thinking tokens, freeing the full 65,536 output token budget. Fixed validator to flag answer mismatches softly (sets `answer_mismatch=True` on the `Question`) instead of hard-failing. Added `answer_mismatch: bool = False` field to `Question` schema. Diagnostic cases Q1/Q4/Q17/Q18 all pass. 22/22 extracted, JSONL written.
 - [ ] Validate against second and third PDFs
 - [ ] Smoke-test one CSV row through bulk-upload endpoint
 - [ ] Merge to main

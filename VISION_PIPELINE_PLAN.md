@@ -81,7 +81,7 @@ Implementation pattern: `Question` in `schema.py` keeps `sub_type` as the full `
 Trim to what's actually referenced:
 
 - Path constants for the surviving directories
-- `GEMINI_MODEL = "gemini-2.5-flash"` (keep; cost test validated this model)
+- `GEMINI_MODEL = "gemini-2.5-flash-lite"` (keep; cost test validated this model)
 - `QUANT_SUB_TOPICS` taxonomy (keep)
 - `VARC_SUB_TOPICS`, `DILR_SUB_TOPICS` — keep for future use, even though VARC/DILR aren't implemented yet
 - `CSV_COLUMNS` (keep)
@@ -239,7 +239,7 @@ Each rerun overwrites the master CSV from current extracted state. No incrementa
 
 **Pricing changes.** Gemini's per-token rates are not stable. Mitigation: pricing constants live in `config.py` with a "last verified on YYYY-MM-DD" comment. Re-check quarterly or before a large batch run.
 
-**PDFs that exceed Gemini's input limit.** `gemini-2.5-flash` accepts large PDFs but there's a cap. Mitigation: log `pdf_size_bytes` in every call; if a PDF is rejected, the fallback is to split it (e.g. extract the Quant section pages only) and concatenate results. Not implemented now because no current PDF approaches the limit.
+**PDFs that exceed Gemini's input limit.** `gemini-2.5-flash-lite` accepts large PDFs but there's a cap. Mitigation: log `pdf_size_bytes` in every call; if a PDF is rejected, the fallback is to split it (e.g. extract the Quant section pages only) and concatenate results. Not implemented now because no current PDF approaches the limit.
 
 **Answer key parse failure.** If a Cracku PDF restructures the Answers section (different heading, different separator), the regex breaks and the validator can't run. Mitigation: `answer_key.py` raises a clear error on parse failure, naming the slice it tried to parse. Fix is a regex tweak, fast.
 
