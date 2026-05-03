@@ -4,7 +4,6 @@ version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = [
     "pdfplumber",
-    "google-generativeai",
     "pydantic",
     "python-dotenv",
     "google-genai>=1.73.1",
