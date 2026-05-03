@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 from typing import Literal
 
@@ -11,6 +12,15 @@ from src.schema import Question, QuestionCategory, QuestionSubType, QuestionType
 
 
 # QA-specific schema wrapper: sub_type locked to QUANT_STANDARD via Literal.
+# JSON \f/\t/\b/\r escape sequences corrupt LaTeX backslashes (\frac→form-feed+rac, etc.)
+# This restores them after parsing.
+_JSON_CTRL_RE = re.compile(r'[\x08\x0c\x0d](?=[a-zA-Z])')
+_JSON_CTRL_MAP = {'\x08': '\\b', '\x0c': '\\f', '\x0d': '\\r'}
+
+def _fix_latex(s: str) -> str:
+    return _JSON_CTRL_RE.sub(lambda m: _JSON_CTRL_MAP[m.group()], s)
+
+
 class _QAQuestion(BaseModel):
     question_number: int
     type: QuestionType
@@ -57,11 +67,11 @@ def extract_pdf(pdf_path: Path, force: bool = False) -> list[Question]:
             category=QuestionCategory.QUANT,
             type=q.type,
             sub_type=QuestionSubType.QUANT_STANDARD,
-            text=q.text,
-            options=q.options,
+            text=_fix_latex(q.text),
+            options=[_fix_latex(o) for o in q.options] if q.options else None,
             correct_answer=q.correct_answer,
             sub_topic=q.sub_topic,
-            explanation=q.explanation,
+            explanation=_fix_latex(q.explanation),
             source_pdf=pdf_path.name,
         )
         for q in extraction.questions

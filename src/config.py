@@ -12,12 +12,12 @@ FINAL_DIR     = DATA / "final"
 FINAL_CSV = FINAL_DIR / "questions_master.csv"
 
 # --- Gemini ---
-GEMINI_MODEL = "gemini-2.5-flash-lite"
+GEMINI_MODEL = "gemini-2.5-flash"
 
 # Pricing as of 2025-05-03 — re-verify quarterly or before a large batch run.
 # Source: https://ai.google.dev/gemini-api/docs/pricing
-PRICE_INPUT_PER_M  = 0.10   # USD per 1M input tokens (gemini-2.5-flash-lite)
-PRICE_OUTPUT_PER_M = 0.40   # USD per 1M output tokens (gemini-2.5-flash-lite)
+PRICE_INPUT_PER_M  = 0.30   # USD per 1M input tokens (gemini-2.5-flash)
+PRICE_OUTPUT_PER_M = 2.50   # USD per 1M output tokens (gemini-2.5-flash)
 
 # --- Taxonomies ---
 QUANT_SUB_TOPICS = [
