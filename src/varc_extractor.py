@@ -3,12 +3,13 @@ import re
 from pathlib import Path
 from typing import Literal
 
+import pdfplumber
 from pydantic import BaseModel, Field, ValidationError
 
 from src import answer_key as ak
 from src import gemini_client, validator
 from src.config import EXTRACTED_DIR, VARC_SUB_TOPICS
-from src.prompts.varc import VARC_PROMPT
+from src.prompts.varc import build_varc_prompt
 from src.schema import Passage, Question, QuestionCategory, QuestionSubType, QuestionType
 
 
@@ -19,53 +20,51 @@ def _fix_latex(s: str) -> str:
     return _JSON_CTRL_RE.sub(lambda m: _JSON_CTRL_MAP[m.group()], s)
 
 
-class _VARCQuestion(BaseModel):
+_INSTRUCTIONS_RE = re.compile(r'Instructions\s*\[\s*(\d+)\s*[-–]\s*(\d+)\s*\]', re.IGNORECASE)
+
+def _parse_instruction_ranges(pdf_path: Path) -> list[tuple[int, int]]:
+    with pdfplumber.open(pdf_path) as pdf:
+        text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+    return [(int(m.group(1)), int(m.group(2))) for m in _INSTRUCTIONS_RE.finditer(text)]
+
+
+_sub_topic_field = Field(description=f"One of: {', '.join(VARC_SUB_TOPICS)}")
+
+
+class _RCQuestion(BaseModel):
+    question_number: int
+    text: str
+    options: list[str]
+    correct_answer: str
+    sub_topic: str = _sub_topic_field
+    explanation: str
+
+
+class _PassageGroup(BaseModel):
+    start: int
+    end: int
+    passage: str
+    questions: list[_RCQuestion]
+
+
+class _OtherQuestion(BaseModel):
     question_number: int
     type: QuestionType
     sub_type: Literal[
-        QuestionSubType.VARC_RC,
         QuestionSubType.VARC_ODD_ONE_OUT,
         QuestionSubType.VARC_JUMBLE,
         QuestionSubType.VARC_MISSING_SENTENCE,
-        QuestionSubType.VARC_SUMMARY,
-        QuestionSubType.VARC_PARA_COMPLETION,
     ]
     text: str
     options: list[str] | None = Field(default=None)
     correct_answer: str
-    sub_topic: str = Field(description=f"One of: {', '.join(VARC_SUB_TOPICS)}")
+    sub_topic: str = _sub_topic_field
     explanation: str
 
 
 class _VARCExtraction(BaseModel):
-    questions: list[_VARCQuestion]
-
-
-def _split_passages(questions: list[Question], source_pdf: str) -> tuple[list[Passage], list[Question]]:
-    """Parse [PASSAGE]/[QUESTION] markers from RC questions.
-
-    Returns deduplicated Passage records and questions with passage_id set and
-    passage text removed from text field. Non-RC questions are returned unchanged.
-    """
-    passages: dict[str, Passage] = {}
-    updated: list[Question] = []
-
-    for q in questions:
-        if q.sub_type != QuestionSubType.VARC_RC or "[PASSAGE]" not in q.text:
-            updated.append(q)
-            continue
-
-        parts = q.text.split("[QUESTION]", 1)
-        passage_text = parts[0].replace("[PASSAGE]", "").strip()
-        question_text = parts[1].strip() if len(parts) > 1 else q.text
-
-        passage_id = hashlib.sha256(passage_text.encode()).hexdigest()[:12]
-        if passage_id not in passages:
-            passages[passage_id] = Passage(id=passage_id, text=passage_text, source_pdf=source_pdf)
-
-        updated.append(q.model_copy(update={"text": question_text, "passage_id": passage_id}))
-
-    return list(passages.values()), updated
+    passage_groups: list[_PassageGroup]
+    other_questions: list[_OtherQuestion]
 
 
 def extract_pdf(pdf_path: Path, force: bool = False) -> list[Question]:
@@ -81,10 +80,14 @@ def extract_pdf(pdf_path: Path, force: bool = False) -> list[Question]:
 
     pdf_bytes = pdf_path.read_bytes()
     answer_key = ak.parse(pdf_path)
+    rc_groups = _parse_instruction_ranges(pdf_path)
+
+    if not rc_groups:
+        print(f"  [WARNING] [{stem}] No 'Instructions [N-M]' blocks found — all questions will land in other_questions")
 
     try:
         extraction: _VARCExtraction = gemini_client.call(
-            prompt=VARC_PROMPT,
+            prompt=build_varc_prompt(rc_groups),
             schema=_VARCExtraction,
             pdf_bytes=pdf_bytes,
             context={"stem": stem},
@@ -93,8 +96,35 @@ def extract_pdf(pdf_path: Path, force: bool = False) -> list[Question]:
         print(f"  [WARNING] [{stem}] Gemini response invalid/truncated — skipping: {exc.error_count()} error(s)")
         return []
 
-    questions = [
-        Question(
+    passages: list[Passage] = []
+    questions: list[Question] = []
+
+    for group in extraction.passage_groups:
+        expected = group.end - group.start + 1
+        if len(group.questions) != expected:
+            print(f"  [WARNING] [{stem}] RC group [{group.start}-{group.end}] has {len(group.questions)} questions, expected {expected}")
+
+        passage_text = _fix_latex(group.passage)
+        passage_id = hashlib.sha256(passage_text.encode()).hexdigest()[:12]
+        passages.append(Passage(id=passage_id, text=passage_text, source_pdf=pdf_path.name))
+
+        for q in group.questions:
+            questions.append(Question(
+                question_number=q.question_number,
+                category=QuestionCategory.VARC,
+                type=QuestionType.MCQ,
+                sub_type=QuestionSubType.VARC_RC,
+                text=_fix_latex(q.text),
+                options=[_fix_latex(o) for o in q.options],
+                correct_answer=q.correct_answer,
+                sub_topic=q.sub_topic,
+                explanation=_fix_latex(q.explanation),
+                source_pdf=pdf_path.name,
+                passage_id=passage_id,
+            ))
+
+    for q in extraction.other_questions:
+        questions.append(Question(
             question_number=q.question_number,
             category=QuestionCategory.VARC,
             type=q.type,
@@ -105,13 +135,11 @@ def extract_pdf(pdf_path: Path, force: bool = False) -> list[Question]:
             sub_topic=q.sub_topic,
             explanation=_fix_latex(q.explanation),
             source_pdf=pdf_path.name,
-        )
-        for q in extraction.questions
-    ]
+        ))
+
+    questions.sort(key=lambda q: q.question_number)
 
     validator.validate(questions, answer_key, stem)
-
-    passages, questions = _split_passages(questions, pdf_path.name)
 
     EXTRACTED_DIR.mkdir(parents=True, exist_ok=True)
     out_path.write_text("\n".join(q.model_dump_json() for q in questions) + "\n")
