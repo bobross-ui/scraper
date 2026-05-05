@@ -9,8 +9,6 @@ EXTRACTED_DIR = DATA / "extracted"
 LOGS_DIR      = DATA / "logs"
 FINAL_DIR     = DATA / "final"
 
-FINAL_CSV = FINAL_DIR / "questions_master.csv"
-
 # --- Gemini ---
 GEMINI_MODEL = "gemini-2.5-flash"
 
@@ -65,18 +63,3 @@ DILR_SUB_TOPICS = [
     "Binary Logic",
 ]
 
-# CSV column order expected by the bulk-upload endpoint
-CSV_COLUMNS = [
-    "type",
-    "category",
-    "sub_type",
-    "sub_topic",
-    "difficulty",
-    "text",
-    "option1",
-    "option2",
-    "option3",
-    "option4",
-    "correct_answer",
-    "explanation",
-]

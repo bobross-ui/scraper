@@ -46,33 +46,3 @@ class Question(BaseModel):
         return self
 
 
-class CSVRow(BaseModel):
-    type: QuestionType
-    category: QuestionCategory
-    sub_type: QuestionSubType
-    sub_topic: str | None
-    difficulty: int = 3
-    text: str
-    option1: str = ""
-    option2: str = ""
-    option3: str = ""
-    option4: str = ""
-    correct_answer: str
-    explanation: str
-
-    @classmethod
-    def from_question(cls, q: Question) -> "CSVRow":
-        opts = q.options or []
-        return cls(
-            type=q.type,
-            category=q.category,
-            sub_type=q.sub_type,
-            sub_topic=q.sub_topic,
-            text=q.text,
-            option1=opts[0] if len(opts) > 0 else "",
-            option2=opts[1] if len(opts) > 1 else "",
-            option3=opts[2] if len(opts) > 2 else "",
-            option4=opts[3] if len(opts) > 3 else "",
-            correct_answer=q.correct_answer,
-            explanation=q.explanation,
-        )
