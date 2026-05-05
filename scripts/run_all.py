@@ -6,7 +6,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from src.config import PDFS_DIR
-from src.extractor import extract_pdf
+from src.extractor import extract_pdf as extract_qa
+from src.varc_extractor import extract_pdf as extract_varc
+
+
+def _pick_extractor(pdf_path):
+    name = pdf_path.name.upper()
+    if "VARC" in name:
+        return extract_varc
+    return extract_qa
 
 
 def main():
@@ -17,7 +25,7 @@ def main():
     total = 0
     for pdf_path in pdf_paths:
         print(f"\n--- {pdf_path.name} ---")
-        questions = extract_pdf(pdf_path)
+        questions = _pick_extractor(pdf_path)(pdf_path)
         print(f"  {len(questions)} questions extracted")
         total += len(questions)
 

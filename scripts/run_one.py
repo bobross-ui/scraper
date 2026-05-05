@@ -8,7 +8,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from src.config import PDFS_DIR
-from src.extractor import extract_pdf
+from src.extractor import extract_pdf as extract_qa
+from src.varc_extractor import extract_pdf as extract_varc
+
+
+def _pick_extractor(pdf_path):
+    name = pdf_path.name.upper()
+    if "VARC" in name:
+        return extract_varc
+    return extract_qa
 
 
 def main():
@@ -21,7 +29,7 @@ def main():
     if not pdf_path.exists():
         raise FileNotFoundError(f"PDF not found: {pdf_path}")
 
-    questions = extract_pdf(pdf_path, force=args.force)
+    questions = _pick_extractor(pdf_path)(pdf_path, force=args.force)
 
     mcq = sum(1 for q in questions if q.type.value == "MCQ")
     tita = sum(1 for q in questions if q.type.value == "TITA")
