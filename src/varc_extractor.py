@@ -3,12 +3,13 @@ import re
 from pathlib import Path
 from typing import Literal
 
+import pdfplumber
 from pydantic import BaseModel, Field, ValidationError
 
 from src import answer_key as ak
 from src import gemini_client, validator
 from src.config import EXTRACTED_DIR, VARC_SUB_TOPICS
-from src.prompts.varc import VARC_PROMPT
+from src.prompts.varc import build_varc_prompt
 from src.schema import Passage, Question, QuestionCategory, QuestionSubType, QuestionType
 
 
@@ -17,6 +18,14 @@ _JSON_CTRL_MAP = {'\x08': '\\b', '\x0c': '\\f', '\x0d': '\\r'}
 
 def _fix_latex(s: str) -> str:
     return _JSON_CTRL_RE.sub(lambda m: _JSON_CTRL_MAP[m.group()], s)
+
+
+_INSTRUCTIONS_RE = re.compile(r'Instructions\s*\[\s*(\d+)\s*[-–]\s*(\d+)\s*\]', re.IGNORECASE)
+
+def _parse_instruction_ranges(pdf_path: Path) -> list[tuple[int, int]]:
+    with pdfplumber.open(pdf_path) as pdf:
+        text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+    return [(int(m.group(1)), int(m.group(2))) for m in _INSTRUCTIONS_RE.finditer(text)]
 
 
 _sub_topic_field = Field(description=f"One of: {', '.join(VARC_SUB_TOPICS)}")
@@ -72,10 +81,11 @@ def extract_pdf(pdf_path: Path, force: bool = False) -> list[Question]:
 
     pdf_bytes = pdf_path.read_bytes()
     answer_key = ak.parse(pdf_path)
+    rc_groups = _parse_instruction_ranges(pdf_path)
 
     try:
         extraction: _VARCExtraction = gemini_client.call(
-            prompt=VARC_PROMPT,
+            prompt=build_varc_prompt(rc_groups),
             schema=_VARCExtraction,
             pdf_bytes=pdf_bytes,
             context={"stem": stem},
