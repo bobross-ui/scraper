@@ -1,3 +1,4 @@
+import hashlib
 import re
 from pathlib import Path
 from typing import Literal
@@ -8,7 +9,7 @@ from src import answer_key as ak
 from src import gemini_client, validator
 from src.config import EXTRACTED_DIR, VARC_SUB_TOPICS
 from src.prompts.varc import VARC_PROMPT
-from src.schema import Question, QuestionCategory, QuestionSubType, QuestionType
+from src.schema import Passage, Question, QuestionCategory, QuestionSubType, QuestionType
 
 
 _JSON_CTRL_RE = re.compile(r'[\x08\x0c\x0d](?=[a-zA-Z])')
@@ -38,6 +39,33 @@ class _VARCQuestion(BaseModel):
 
 class _VARCExtraction(BaseModel):
     questions: list[_VARCQuestion]
+
+
+def _split_passages(questions: list[Question], source_pdf: str) -> tuple[list[Passage], list[Question]]:
+    """Parse [PASSAGE]/[QUESTION] markers from RC questions.
+
+    Returns deduplicated Passage records and questions with passage_id set and
+    passage text removed from text field. Non-RC questions are returned unchanged.
+    """
+    passages: dict[str, Passage] = {}
+    updated: list[Question] = []
+
+    for q in questions:
+        if q.sub_type != QuestionSubType.VARC_RC or "[PASSAGE]" not in q.text:
+            updated.append(q)
+            continue
+
+        parts = q.text.split("[QUESTION]", 1)
+        passage_text = parts[0].replace("[PASSAGE]", "").strip()
+        question_text = parts[1].strip() if len(parts) > 1 else q.text
+
+        passage_id = hashlib.sha256(passage_text.encode()).hexdigest()[:12]
+        if passage_id not in passages:
+            passages[passage_id] = Passage(id=passage_id, text=passage_text, source_pdf=source_pdf)
+
+        updated.append(q.model_copy(update={"text": question_text, "passage_id": passage_id}))
+
+    return list(passages.values()), updated
 
 
 def extract_pdf(pdf_path: Path, force: bool = False) -> list[Question]:
@@ -83,7 +111,12 @@ def extract_pdf(pdf_path: Path, force: bool = False) -> list[Question]:
 
     validator.validate(questions, answer_key, stem)
 
+    passages, questions = _split_passages(questions, pdf_path.name)
+
     EXTRACTED_DIR.mkdir(parents=True, exist_ok=True)
     out_path.write_text("\n".join(q.model_dump_json() for q in questions) + "\n")
+    if passages:
+        passages_path = EXTRACTED_DIR / f"{stem}_passages.jsonl"
+        passages_path.write_text("\n".join(p.model_dump_json() for p in passages) + "\n")
 
     return questions

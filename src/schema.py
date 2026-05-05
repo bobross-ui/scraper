@@ -24,6 +24,12 @@ class QuestionSubType(str, Enum):
     DILR_STANDARD         = "DILR_STANDARD"
 
 
+class Passage(BaseModel):
+    id: str        # first 12 hex chars of sha256(text)
+    text: str
+    source_pdf: str
+
+
 class Question(BaseModel):
     question_number: int
     category: QuestionCategory
@@ -35,6 +41,7 @@ class Question(BaseModel):
     sub_topic: str | None
     explanation: str
     source_pdf: str
+    passage_id: str | None = None
     answer_mismatch: bool = False
 
     @model_validator(mode="after")
