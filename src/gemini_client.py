@@ -8,7 +8,7 @@ from google import genai
 from google.genai import types
 from pydantic import BaseModel
 
-from src.config import GEMINI_MODEL, LOGS_DIR
+from src.config import GEMINI_MODEL, LOGS_DIR, PRICE_INPUT_PER_M, PRICE_OUTPUT_PER_M
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -31,24 +31,34 @@ def _write_log(entry: dict):
         f.write(json.dumps(entry) + "\n")
 
 
-def call(prompt: str, schema: Type[T], context: dict | None = None) -> T:
-    """
-    Make a structured Gemini call with rate-limiting and retry.
-    Returns a validated instance of `schema`.
-    Raises on permanent failure after 3 attempts.
-    """
+def call(
+    prompt: str,
+    schema: Type[T],
+    pdf_bytes: bytes | None = None,
+    context: dict | None = None,
+) -> T:
     client = _get_client()
 
     log_entry: dict = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "schema": schema.__name__,
         "context": context,
+        "pdf_size_bytes": len(pdf_bytes) if pdf_bytes else None,
         "outcome": None,
         "latency_ms": None,
         "input_tokens": None,
         "output_tokens": None,
+        "cost_usd": None,
         "error": None,
     }
+
+    if pdf_bytes:
+        contents = [
+            types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf"),
+            prompt,
+        ]
+    else:
+        contents = prompt
 
     last_exc: Exception | None = None
     for attempt in range(3):
@@ -56,27 +66,39 @@ def call(prompt: str, schema: Type[T], context: dict | None = None) -> T:
         try:
             response = client.models.generate_content(
                 model=GEMINI_MODEL,
-                contents=prompt,
+                contents=contents,
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
                     response_schema=schema,
+                    thinking_config=types.ThinkingConfig(thinking_budget=0),
+                    max_output_tokens=65536,
                 ),
             )
             latency_ms = int((time.monotonic() - t0) * 1000)
             result = schema.model_validate_json(response.text)
 
             usage = getattr(response, "usage_metadata", None)
+            input_tokens = getattr(usage, "prompt_token_count", None)
+            output_tokens = getattr(usage, "candidates_token_count", None)
+            cost_usd = None
+            if input_tokens is not None and output_tokens is not None:
+                cost_usd = round(
+                    input_tokens / 1_000_000 * PRICE_INPUT_PER_M
+                    + output_tokens / 1_000_000 * PRICE_OUTPUT_PER_M,
+                    6,
+                )
+
             log_entry.update(
                 outcome="ok",
                 latency_ms=latency_ms,
-                input_tokens=getattr(usage, "prompt_token_count", None),
-                output_tokens=getattr(usage, "candidates_token_count", None),
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                cost_usd=cost_usd,
             )
             _write_log(log_entry)
             return result
 
         except Exception as exc:
-            # Retry on rate limit (429) or transient server errors (500, 503)
             err_str = str(exc)
             is_retryable = any(code in err_str for code in ("429", "500", "503", "RESOURCE_EXHAUSTED", "UNAVAILABLE"))
             latency_ms = int((time.monotonic() - t0) * 1000)

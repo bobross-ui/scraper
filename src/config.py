@@ -4,19 +4,18 @@ from pathlib import Path
 ROOT = Path(__file__).parent.parent
 DATA = ROOT / "data"
 
-PDFS_DIR        = DATA / "pdfs"
-RAW_TEXT_DIR    = DATA / "raw_text"
-PARSED_DIR      = DATA / "parsed"
-ANSWER_KEYS_DIR = DATA / "answer_keys"
-EXTRACTED_DIR   = DATA / "extracted"
-ENRICHED_DIR    = DATA / "enriched"
-LOGS_DIR        = DATA / "logs"
-FINAL_DIR       = DATA / "final"
-
-FINAL_CSV = FINAL_DIR / "questions_master.csv"
+PDFS_DIR      = DATA / "pdfs"
+EXTRACTED_DIR = DATA / "extracted"
+LOGS_DIR      = DATA / "logs"
+FINAL_DIR     = DATA / "final"
 
 # --- Gemini ---
 GEMINI_MODEL = "gemini-2.5-flash"
+
+# Pricing as of 2025-05-03 — re-verify quarterly or before a large batch run.
+# Source: https://ai.google.dev/gemini-api/docs/pricing
+PRICE_INPUT_PER_M  = 0.30   # USD per 1M input tokens (gemini-2.5-flash)
+PRICE_OUTPUT_PER_M = 2.50   # USD per 1M output tokens (gemini-2.5-flash)
 
 # --- Taxonomies ---
 QUANT_SUB_TOPICS = [
@@ -51,18 +50,16 @@ VARC_SUB_TOPICS = [
     "Vocabulary",
 ]
 
-# CSV column order expected by the bulk-upload endpoint
-CSV_COLUMNS = [
-    "type",
-    "category",
-    "sub_type",
-    "sub_topic",
-    "difficulty",
-    "text",
-    "option1",
-    "option2",
-    "option3",
-    "option4",
-    "correct_answer",
-    "explanation",
+DILR_SUB_TOPICS = [
+    "Tables",
+    "Bar Charts",
+    "Line Graphs",
+    "Pie Charts",
+    "Venn Diagrams",
+    "Logical Puzzles",
+    "Arrangements",
+    "Games & Tournaments",
+    "Networks & Routes",
+    "Binary Logic",
 ]
+
