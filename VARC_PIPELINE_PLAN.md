@@ -15,7 +15,6 @@ Reference PDF: `data/pdfs/CAT 2025 Slot 1 Question Paper VARC by Cracku.pdf` (24
 | `VARC_JUMBLE` | Four sentences given; key in the correct sequence | TITA | `6.2143`, `13.3421` |
 | `VARC_MISSING_SENTENCE` | A sentence is missing from a paragraph; pick its position | MCQ | `7.A`, `8.B` |
 
-`VARC_SUMMARY` and `VARC_PARA_COMPLETION` are in the schema but not present in this PDF — keep them in the Literal union so they don't break when they appear.
 
 RC questions are grouped under "Instructions [N - M]" headers. Q2-5, Q9-12, Q14-18, Q20-24 are RC groups in the reference PDF.
 
@@ -92,9 +91,7 @@ sub_type: Literal[
     QuestionSubType.VARC_RC,
     QuestionSubType.VARC_JUMBLE,
     QuestionSubType.VARC_ODD_ONE_OUT,
-    QuestionSubType.VARC_MISSING_SENTENCE,
-    QuestionSubType.VARC_SUMMARY,
-    QuestionSubType.VARC_PARA_COMPLETION,
+    QuestionSubType.VARC_MISSING_SENTENCE
 ]
 ```
 All other fields identical to `_QAQuestion`.
